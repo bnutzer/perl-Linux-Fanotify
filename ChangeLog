@@ -2,3 +2,7 @@ Change log for Linux::Fanotify
 
 20140717	[ 1.0 ]
 	- Initial release
+
+20140722	[ 1.1 ]
+	- New autoclose variables for events and fanotify groups
+	- Documentation updates

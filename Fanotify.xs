@@ -119,42 +119,6 @@ dumpEvent(const struct fanotify_bundle *bundle) {
 }
 
 int
-_event_close(SV *self) {
-	struct fanotify_bundle *bundle;
-	int ret;
-	SV *sv_default_response;
-	int default_response = FAN_DENY;
-
-	if (!(bundle = event2bundle(self))) {
-		Perl_croak(aTHX_ "Invalid event object");
-	}
-
-	if (sv_default_response = get_sv("Linux::Fanotify::default_response", 0)) {
-		default_response = SvIV(sv_default_response);
-		if (default_response == -1) {
-			default_response = FAN_DENY;
-		}
-	}
-
-	if (bundle->needs_response) {
-		if (default_response) {
-			_event_write_response(self, default_response);
-		}
-	}
-
-	if (bundle->metadata.fd > 0) {
-		ret = close(bundle->metadata.fd);
-		if (ret == 0) {
-			bundle->metadata.fd = -1;
-		}
-	} else {
-		errno = EBADF;
-		ret = -1;
-	}
-	return ret;
-}
-
-int
 _event_write_response(SV *event, int response) {
 	struct fanotify_bundle *bundle;
 	struct fanotify_response rsp;
@@ -185,6 +149,42 @@ _event_write_response(SV *event, int response) {
 		bundle->needs_response = 0;
 	}
 
+	return ret;
+}
+
+int
+_event_close(SV *self) {
+	struct fanotify_bundle *bundle;
+	int ret;
+	SV *sv_default_response;
+	int default_response = FAN_DENY;
+
+	if (!(bundle = event2bundle(self))) {
+		Perl_croak(aTHX_ "Invalid event object");
+	}
+
+	if ((sv_default_response = get_sv("Linux::Fanotify::default_response", 0))) {
+		default_response = SvIV(sv_default_response);
+		if (default_response == -1) {
+			default_response = FAN_DENY;
+		}
+	}
+
+	if (bundle->needs_response) {
+		if (default_response) {
+			_event_write_response(self, default_response);
+		}
+	}
+
+	if (bundle->metadata.fd > 0) {
+		ret = close(bundle->metadata.fd);
+		if (ret == 0) {
+			bundle->metadata.fd = -1;
+		}
+	} else {
+		errno = EBADF;
+		ret = -1;
+	}
 	return ret;
 }
 
@@ -424,13 +424,20 @@ fanogrp_DESTROY(self)
 	SV *self
     INIT:
 	int fd;
+	int autoclose = 1;
+	SV *sv_autoclose;
     CODE:
 	if (!notgrp2fd(self, &fd)) {
 		Perl_croak(aTHX_ "Invalid notification group object");
 	}
 
 	if (fd > 0) {
-		close(fd);
+		if ((sv_autoclose = get_sv("Linux::Fanotify::FanotifyGroup::autoclose", 0))) {
+			autoclose = SvIV(sv_autoclose);
+		}
+		if (autoclose) {
+			close(fd);
+		}
 	}
 
 # /*
@@ -467,8 +474,15 @@ void
 event_DESTROY(self)
 	SV *self
     INIT:
+	int autoclose = 1;
+	SV *sv_autoclose;
     CODE:
-	_event_close(self);
+	if ((sv_autoclose = get_sv("Linux::Fanotify::Event::autoclose", 0))) {
+		autoclose = SvIV(sv_autoclose);
+	}
+	if (autoclose) {
+		_event_close(self);
+	}
 
 #
 #

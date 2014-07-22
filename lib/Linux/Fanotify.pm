@@ -87,6 +87,8 @@ sub init {
 
 package Linux::Fanotify::FanotifyGroup;
 
+our $autoclose = 1;
+
 sub new {
 	my $class = shift;
 	return Linux::Fanotify::fanotify_init(@_);
@@ -102,6 +104,8 @@ sub read {
 
 package Linux::Fanotify::Event;
 
+our $autoclose = 1;
+
 use overload '""' => sub { my $self = shift; return $self->_stringify(); };
 
 1;
@@ -114,11 +118,11 @@ Linux::Fanotify - Perl interface to the Linux fanotify API
 
 =head1 VERSION
 
-Version 1.0
+Version 1.1
 
 =cut
 
-our $VERSION = '1.0';
+our $VERSION = '1.1';
 
 =head1 SYNOPSIS
 
@@ -178,10 +182,12 @@ After marking such objects, a program can read from the notification group
 file descriptor to receive events; in case of permission requests, a
 response needs to be written to the notification group.
 
-The currently available standard man pages for the fanotify operations
-are incomplete and in some cases downright incorrect. Please consult
-L<3rd party fanotify man pages|http://www.xypron.de/projects/fanotify-manpages/>
-for more apt information.
+As of today (mid 2014), the fanotify man pages have not yet made their
+way into the distributions, so please consult the
+L<Linux man pages project|https://www.kernel.org/doc/man-pages/>
+instead. The relevant pages are fanotify(7), fanotify_init(2), and
+fanotify_mark(2). Please note that man pages prior to version 3.68,
+released 2014-05-28, are incorrect.
 
 =head1 About this module
 
@@ -200,7 +206,7 @@ except that you don't).
 
 =head2 Package C<Linux::Fanotify>
 
-=head3 Property C<$Linux::Fanotify::default_response>
+=head3 Package-global variable C<$Linux::Fanotify::default_response>
 
 This package-global variable triggers a default response for permission
 events in case no explicit response has been issued.
@@ -232,12 +238,24 @@ constructor. See the documentation below.
 
 =head2 Package C<Linux::Fanotify::FanotifyGroup>
 
+=head3 Package-global variable C<$Linux::Fanotify::FanotifyGroup::autoclose>
+
+This variable defaults to 1 and results in the fanotify group being closed when
+objects of this type are destroyed (e.g. by going out of scope).
+
+This almost definitely is what you want. However, if you use multithreading
+or similar wizardry, passing around objects may result in destruction of
+copies of this object and subsequent, wrongly closing of the notification
+group.
+
+Take care when setting this to 0 (or undef).
+
 =head3 Constructor C<new($flags, $event_f_flags)>
 
 Constructs and returns a new C<Linux::Fanotify::FanotifyGroup> object.
 
 Please consult the
-L<aforementioned man pages|http://www.xypron.de/projects/fanotify-manpages/>
+L<aforementioned man pages|http://man7.org/linux/man-pages/man2/fanotify_init.2.html>
 for information on C<$flags> and C<$event_f_flags>.
 
 Returns C<undef> in case of error; consult L<perlvar/"$!"> in this case.
@@ -248,7 +266,7 @@ Marks the given entity ($dirfd, $pathname) in the current notification
 group with the given properties.
 
 Again, see
-L<the man pages|http://www.xypron.de/projects/fanotify-manpages/>
+L<the man pages|http://man7.org/linux/man-pages/man2/fanotify_mark.2.html>
 for detailed information about the arguments.
 
 C<$flags> can be one of C<FAN_MARK_ADD>, C<FAN_MARK_REMOVE>, and
@@ -298,7 +316,9 @@ After a manual closing of a notification group, this will be -1.
 
 Closes the notification group.
 
-This method does not have to be called manually; the object's destruction will
+This method does not have to be called manually (unless
+L</"Package-global variable C<$Linux::Fanotify::FanotifyGroup::autoclose>">
+has been set to 0); the object's destruction will
 automatically close the file descriptor.
 
 Any events present in the event queue will be flushed (that includes an
@@ -315,6 +335,18 @@ of the event meta data and can only be accessed via the described methods.
 Use the getter methods listed below to get information about the event
 properties.
 
+=head3 Package-global variable C<$Linux::Fanotify::Event::autoclose>
+
+This variable defaults to 1 and results in the event's file descriptor being
+closed when objects of this type are destroyed (e.g. by going out of scope).
+
+This almost definitely is what you want. However, if you use multithreading
+or similar witchcraft, passing around objects may result in destruction of
+copies of this object and subsequent, wrongly closing of the files.
+
+Take care when setting this to 0 (or undef) and manually close every event's
+file descriptor.
+
 =head3 Object method C<close()>
 
 Closes the event's file descriptor. For non-permission events, this results
@@ -326,7 +358,9 @@ response is created in case no explicit response was issued. See
 L<above|/"Property C<$Linux::Fanotify::default_response>"> for more
 information about default responses.
 
-Manually closing the file descriptor is normally not required; as soon as
+Manually closing the file descriptor is normally not required (unless the
+L</"Package-global variable C<$Linux::Fanotify::Event::autoclose>"> has
+been set to a false value); as soon as
 the event object is going out of scope, it will automatically be closed
 to prevent leaking file descriptors. If you intentionally want to keep
 a file descriptor open, store the event object in a variable of your

@@ -5,9 +5,12 @@ Interface for the Linux fanotify API.
 The fanotify API provides notification and interception of filesystem events.
 
 This perl module is documented in its perldoc (see perldoc Linux::Fanotify).
-The low level functions are basically documented in the fanotify_init(2) and
-fanotify_mark(2) man pages; better documentation can be found in
-http://www.xypron.de/projects/fanotify-manpages/
+The low level functions are documented in the fanotify(7), fanotify_init(2)
+and fanotify_mark(2) man pages; as of today (mid 2014), the relevant
+updates have not made their way into the distributions' man page packages,
+so you might want to visit the originals at
+https://www.kernel.org/doc/man-pages/
+instead.
 
 The "sample/" subdirectory of this distribution contains a few simple
 demonstrations of this module.
