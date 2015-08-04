@@ -118,11 +118,11 @@ Linux::Fanotify - Perl interface to the Linux fanotify API
 
 =head1 VERSION
 
-Version 1.1
+Version 1.1.1
 
 =cut
 
-our $VERSION = '1.1';
+our $VERSION = '1.1.1';
 
 =head1 SYNOPSIS
 

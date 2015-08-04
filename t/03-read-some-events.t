@@ -2,6 +2,9 @@
 
 use strict;
 
+use lib ('.', 't/');
+use _validate_kernel;
+
 use Test::More;
 
 use Linux::Fanotify qw(:consts :funcs);
@@ -10,14 +13,24 @@ use File::Basename qw(basename dirname);
 use File::Temp qw(mkdtemp);
 use File::Path qw(rmtree);
 use Cwd qw(abs_path);
+use POSIX qw(ENOSYS EINVAL);
 
 if ($< != 0) {
 	plan skip_all => 'no root';
 }
 
-plan tests => 12;
+my $feat = _fano_features();
+if (defined($feat) && (! ($feat & HAS_FANO_PERM))) {
+	plan skip_all => 'Kernel does not seem to have fanotify for access permissions enabled.';
+}
 
 my $fanogrp = new Linux::Fanotify::FanotifyGroup(FAN_CLOEXEC | FAN_CLASS_CONTENT, O_RDONLY | O_LARGEFILE);
+
+if (!$fanogrp && ! defined($feat) && $! == ENOSYS) {
+	plan skip_all => 'Unknown kernel features, and fanotify returned lacking kernel support.';
+}
+
+plan tests => 12;
 
 ok($fanogrp, "Have an fd");
 
@@ -25,7 +38,7 @@ my $validfd = $fanogrp && UNIVERSAL::isa($fanogrp, 'Linux::Fanotify::FanotifyGro
 ok($validfd, "Our fd is a Linux::Fanotify::FanotifyGroup");
 
 SKIP: {
-	skip 'Cannot continue without a valid fanofd', 7 unless ($validfd);
+	skip 'Cannot continue without a valid fanofd', 10 unless ($validfd);
 
 	#
 	# Prepare a test directory with some test files that can later be marked
@@ -39,12 +52,12 @@ SKIP: {
 	my $fn2 = $path . '/deny';
 
 	my $fh;
-	open($fh, '>', $fn1) || skip('Could not open ' . $fn1, 7); close($fh);
-	open($fh, '>', $fn2) || skip('Could not open ' . $fn2, 7); close($fh);
+	open($fh, '>', $fn1) || skip('Could not open ' . $fn1, 10); close($fh);
+	open($fh, '>', $fn2) || skip('Could not open ' . $fn2, 10); close($fh);
 
 	my $pid = fork();
 
-	skip 'Fork failed, cannot proceed', 7 unless (defined($pid));
+	skip 'Fork failed, cannot proceed', 10 unless (defined($pid));
 
 	if ($pid == 0) {
 		#
@@ -93,6 +106,11 @@ SKIP: {
 	}
 
 	my $ret = $fanogrp->mark(FAN_MARK_ADD, FAN_OPEN_PERM, -1, $fn1);
+
+	if ((!$ret) && !defined($feat) && $! == EINVAL) {
+		skip 'Unknown kernel features, and fanotify_mark returned EINVAL. Assuming lacking CONFIG_FANOTIFY_ACCESS_PERMISSIONS support.', 10;
+	}
+
 	ok($ret, 'Successfully fanotify_mark()ed target path ' . $fn1);
 	if (!$ret) {
 		diag("After failed fanotify_mark, errno is $!\n");

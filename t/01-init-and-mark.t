@@ -8,20 +8,33 @@
 #
 use strict;
 
+use lib ('.', 't/');
+use _validate_kernel;
+
 use Test::More;
 
 use Linux::Fanotify qw(:consts :funcs);
 use Fcntl;	# Provides O_* constants required for fanotify_init
 use File::Basename;
 use Cwd qw(abs_path);
+use POSIX qw(ENOSYS);
 
 if ($< != 0) {
 	plan skip_all => 'no root';
 }
 
-plan tests => 3;
+my $feat = _fano_features();
+if (defined($feat) && (! ($feat & HAS_FANO))) {
+	plan skip_all => 'Kernel does not seem to have fanotify enabled.';
+}
 
 my $fanogroup = fanotify_init(FAN_CLOEXEC | FAN_CLASS_CONTENT | FAN_NONBLOCK, O_RDONLY | O_LARGEFILE);
+
+if (!$fanogroup && ! defined($feat) && $! == ENOSYS) {
+	plan skip_all => 'Unknown kernel features, and fanotify returned lacking kernel support.';
+}
+
+plan tests => 3;
 
 ok($fanogroup, "Have a fanotify group");
 

@@ -1,4 +1,8 @@
-use 5.006001;
+use 5.013;
+# Need at least perl 5.13; older versions don't provide some xs macro used here.
+# However, fanotify was released in 2011; perl 5.13 was released in 2010. We
+# probably will not loose any users when relying on a newer perl.
+
 use ExtUtils::MakeMaker;
 use ExtUtils::Liblist;
 use ExtUtils::Constant 0.23 'WriteConstants';
